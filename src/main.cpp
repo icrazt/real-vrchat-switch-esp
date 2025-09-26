@@ -8,6 +8,8 @@
 #include <freertos/task.h>
 #include <freertos/queue.h>
 
+#include <Preferences.h>
+
 #include "strandtest_nodelay.h"
 
 #define KEY_USER_2     2
@@ -35,6 +37,10 @@ constexpr unsigned long kBreathingIntervalMs = 30;
 constexpr uint8_t kSolidColorR = 255;
 constexpr uint8_t kSolidColorG = 140;
 constexpr uint8_t kSolidColorB = 0;
+
+constexpr char kPrefsNamespace[] = "lighting";
+constexpr char kPrefsBrightnessKey[] = "brightness";
+constexpr char kPrefsGlowKey[] = "glow";
 
 enum class BrightnessMode : uint8_t {
   kBright = 0,
@@ -75,6 +81,9 @@ constexpr std::size_t kGlowModeCount = sizeof(kGlowModes) / sizeof(kGlowModes[0]
 
 QueueHandle_t button_event_queue = nullptr;
 
+Preferences preferences;
+bool preferences_ready = false;
+
 uint8_t BrightnessForMode(BrightnessMode mode) {
   return mode == BrightnessMode::kBright ? kBrightnessHigh : kBrightnessLow;
 }
@@ -93,6 +102,68 @@ uint8_t BreathingStep(BrightnessMode mode) {
 
 uint32_t MakeColor(uint8_t r, uint8_t g, uint8_t b) {
   return strip.Color(r, g, b);
+}
+
+BrightnessMode ToBrightnessMode(int value) {
+  switch (value) {
+    case static_cast<int>(BrightnessMode::kDim):
+      return BrightnessMode::kDim;
+    case static_cast<int>(BrightnessMode::kBright):
+    default:
+      return BrightnessMode::kBright;
+  }
+}
+
+GlowMode ToGlowMode(int value) {
+  for (GlowMode mode : kGlowModes) {
+    if (static_cast<int>(mode) == value) {
+      return mode;
+    }
+  }
+  return GlowMode::kSolid;
+}
+
+std::size_t GlowModeIndex(GlowMode mode) {
+  for (std::size_t i = 0; i < kGlowModeCount; ++i) {
+    if (kGlowModes[i] == mode) {
+      return i;
+    }
+  }
+  return 0;
+}
+
+BrightnessMode LoadPersistedBrightness() {
+  if (!preferences_ready) {
+    return BrightnessMode::kBright;
+  }
+  const int stored = preferences.getInt(kPrefsBrightnessKey,
+                                        static_cast<int>(BrightnessMode::kBright));
+  return ToBrightnessMode(stored);
+}
+
+GlowMode LoadPersistedGlow(std::size_t &index) {
+  if (!preferences_ready) {
+    index = 0;
+    return GlowMode::kSolid;
+  }
+  const int stored = preferences.getInt(kPrefsGlowKey, static_cast<int>(GlowMode::kSolid));
+  const GlowMode mode = ToGlowMode(stored);
+  index = GlowModeIndex(mode);
+  return mode;
+}
+
+void SaveBrightnessPreference(BrightnessMode mode) {
+  if (!preferences_ready) {
+    return;
+  }
+  preferences.putInt(kPrefsBrightnessKey, static_cast<int>(mode));
+}
+
+void SaveGlowPreference(GlowMode mode) {
+  if (!preferences_ready) {
+    return;
+  }
+  preferences.putInt(kPrefsGlowKey, static_cast<int>(mode));
 }
 
 void PublishButtonEvent(ButtonEventType type) {
@@ -221,9 +292,9 @@ void TaskButton(void *param) {
 }
 
 void TaskRGB(void *param) {
-  BrightnessMode requested_brightness = BrightnessMode::kBright;
-  GlowMode requested_glow = GlowMode::kSolid;
   std::size_t glow_mode_index = 0;
+  BrightnessMode requested_brightness = LoadPersistedBrightness();
+  GlowMode requested_glow = LoadPersistedGlow(glow_mode_index);
 
   BrightnessMode applied_brightness = requested_brightness;
   GlowMode applied_glow = requested_glow;
@@ -265,11 +336,13 @@ void TaskRGB(void *param) {
     if (requested_brightness != applied_brightness) {
       applied_brightness = requested_brightness;
       SyncBrightness(applied_brightness, applied_glow, breathing_state, solid_needs_refresh);
+      SaveBrightnessPreference(applied_brightness);
     }
 
     if (requested_glow != applied_glow) {
       applied_glow = requested_glow;
       ConfigureForMode(applied_glow, applied_brightness, breathing_state, solid_needs_refresh);
+      SaveGlowPreference(applied_glow);
     }
 
     switch (applied_glow) {
@@ -307,6 +380,11 @@ void setup() {
   digitalWrite(PIN_RGB_EN, HIGH);
 
   Serial.begin(115200);
+
+  preferences_ready = preferences.begin(kPrefsNamespace, false);
+  if (!preferences_ready) {
+    Serial.println("Failed to initialise preferences storage.");
+  }
 
   button_event_queue = xQueueCreate(8, sizeof(ButtonEvent));
   if (button_event_queue == nullptr) {
