@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <Adafruit_NeoPixel.h>
 
 // 按键定义
 #define KEY_USER_2     2
@@ -10,16 +11,28 @@
 #define PIN_RGB_EN     10    // WS2812 灯珠供电使能
 #define RGB_NUM        22    // WS2812 灯珠数量
 
-constexpr unsigned long kBlinkIntervalMs = 500;
+Adafruit_NeoPixel pixels(RGB_NUM, PIN_RGB, NEO_GRB + NEO_KHZ800);
+#define DELAYVAL 500 // Time (in milliseconds) to pause between pixels
 
 void setup() {
   pinMode(PIN_LED, OUTPUT);
+  pinMode(PIN_RGB_EN, OUTPUT);
   digitalWrite(PIN_LED, LOW);
+  digitalWrite(PIN_RGB_EN, HIGH);
+  
+  pixels.begin(); // INITIALIZE NeoPixel strip object (REQUIRED)
+  pixels.clear(); // Set all pixel colors to 'off'
 }
 
 void loop() {
-  digitalWrite(PIN_LED, HIGH);
-  delay(kBlinkIntervalMs);
-  digitalWrite(PIN_LED, LOW);
-  delay(kBlinkIntervalMs);
+    for(int i=0; i<RGB_NUM; i++) { // For each pixel...
+
+    // pixels.Color() takes RGB values, from 0,0,0 up to 255,255,255
+    // Here we're using a moderately bright green color:
+    pixels.setPixelColor(i, pixels.Color(50, 0, 50));
+
+    pixels.show();   // Send the updated pixel colors to the hardware.
+
+    delay(DELAYVAL); // Pause before next pass through loop
+  }
 }
