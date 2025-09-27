@@ -267,6 +267,8 @@ void UpdateBreathing(BrightnessMode brightness_mode, BreathingState &breathing_s
   }
 
   strip.setBrightness(breathing_state.brightness);
+  // Reapply the base color because setBrightness rescales the pixel buffer.
+  strip.fill(MakeColor(kSolidColorR, kSolidColorG, kSolidColorB), 0, strip.numPixels());
   strip.show();
 }
 
