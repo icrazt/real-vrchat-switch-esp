@@ -27,16 +27,16 @@ StrandtestController strandtest(strip);
 
 namespace {
 
-constexpr uint8_t kBrightnessHigh = 200;
-constexpr uint8_t kBrightnessLow = 40;
+constexpr uint8_t kBrightnessHigh = 150;
+constexpr uint8_t kBrightnessLow = 12;
 
 constexpr TickType_t kButtonTaskDelay = pdMS_TO_TICKS(5);
 constexpr TickType_t kRgbTaskDelay = pdMS_TO_TICKS(10);
 
 constexpr unsigned long kBreathingIntervalMs = 30;
-constexpr uint8_t kSolidColorR = 255;
-constexpr uint8_t kSolidColorG = 140;
-constexpr uint8_t kSolidColorB = 0;
+constexpr uint8_t kSolidColorR = 200;
+constexpr uint8_t kSolidColorG = 200;
+constexpr uint8_t kSolidColorB = 200;
 
 constexpr char kPrefsNamespace[] = "lighting";
 constexpr char kPrefsBrightnessKey[] = "brightness";
